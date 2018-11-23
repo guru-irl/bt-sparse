@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#include "genlib.hpp"
+#include "../include/genlib.hpp"
 
 #define SYSERROR()  errno
 
@@ -60,7 +60,10 @@ void generate_file(string path, int nodes, opts vars) {
         for (i = 0; i < nodes; i++) {
             n_edges = vars.minedges + rand()%(vars.maxedges - vars.minedges + 1);
             for(j = 0; j < n_edges; j++) {
-                fout_c << (rand()%nodes) << endl;
+
+                int e = rand()%nodes;
+                while(e == i) e = rand()%nodes; 
+                fout_c << (e) << endl;
             }
             curr += n_edges;
             fout_r << curr << endl;
