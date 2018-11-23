@@ -8,17 +8,16 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#include "../include/genlib.hpp"
+#include "genlib.hpp"
 
 #define SYSERROR()  errno
-#define KEYLENGTH 16
 
 using namespace std;
 
 typedef unsigned char byte;
 
 /*
-    1 Step -> M Batches -> N files per batch
+    1 Step -> M Batches -> N nodes per batch
 */
 
 void make_dir(string path) {
@@ -45,56 +44,48 @@ void check_make_dir(string path) {
     }
 }
 
-void generate_file(string path, int n_bytes) {
-    ofstream fout;
-    fout.open(path, ios::binary);
+void generate_file(string path, int nodes, opts vars) {
+    
+    ofstream fout_r;
+    fout_r.open(path + "_r");
 
-    if(fout.is_open()){
-        int i;
-        byte b;
-        for(i = 0; i < n_bytes; i++) {
-            b = rand()%256;
-            fout << b;
+    ofstream fout_c;
+    fout_c.open(path + "_c");
+
+    int n_edges, i, j;
+    if (fout_r.is_open() && fout_c.is_open()) {
+
+        int curr = 0;
+        fout_r << curr << endl;
+        for (i = 0; i < nodes; i++) {
+            n_edges = vars.minedges + rand()%(vars.maxedges - vars.minedges + 1);
+            for(j = 0; j < n_edges; j++) {
+                fout_c << (rand()%nodes) << endl;
+            }
+            curr += n_edges;
+            fout_r << curr << endl;
         }
-        fout.close();
+
+        fout_c.close();
+        fout_r.close();
     }
     else {
-        cerr<<"Failed to open file : "<< SYSERROR() << std::endl;
-        exit(1);
-    }
-
-    fout.open(path + "_key", ios::binary);
-    if(fout.is_open()){
-        int i;
-        byte b;
-        for(i = 0; i < KEYLENGTH; i++) {
-            b = rand()%256;
-            fout << b;
-        }
-        fout.close();
-    }
-    else {
-        cerr<<"Failed to open file : "<< SYSERROR() << std::endl;
+        cerr << "Failed to open file : "<< SYSERROR() << std::endl;
         exit(1);
     }
 }
 
 void generate(opts vars) {
-    int i, j, k, n_bytes;
+    int i, j, k, n_edges;
     string path;
-    for(i = vars.n_files_start; i <= vars.n_files_end; i+=vars.step) {
-        for (j = 0; j < vars.m_batches; j++) {
-            for(k = 0; k < i; k++) {
-                path = vars.path + "/" + to_string(i);
-                check_make_dir(path);
-                path = path + "/" + to_string(j);  
-                check_make_dir(path);
-                path = path + "/" + to_string(k);
-                cout << path << endl;
-                n_bytes = vars.minlength + rand()%(vars.maxlength - vars.minlength + 1);
-                n_bytes -= n_bytes%16;
-                generate_file(path, n_bytes);
-            }
+    for(i = vars.n_nodes_start; i <= vars.n_nodes_end; i*=vars.step) {
+        for (j = 0; j < vars.n_files; j++) {
+            path = vars.path + "/" + to_string(i);
+            check_make_dir(path);
+            path = path + "/" + to_string(j);  
+            cout << path << endl;
+
+            generate_file(path, i, vars);
         }
     }
 }
@@ -103,24 +94,7 @@ int main(int argc, char const *argv[])
 {
     opts vars = get_defaults();
     
-    /*
-    vars.path = argv[1];
-    vars.n_files_start = stoi(argv[2]);
-    vars.n_files_end = stoi(argv[3]);
-    vars.step = stoi(argv[4]);
-    vars.m_batches = stoi(argv[5]);
-    */  
-    
-    /*vars.path = "../dataset";
-    vars.n_files_start = 100;
-    vars.n_files_end = 1000;
-    vars.step = 100;
-    vars.m_batches = 1;
-    vars.minlength = 1024; //bytes
-    vars.maxlength = 1024*32; //bytes*/
-
-    srand(time(NULL));
-
+    srand(123456);
     check_make_dir(vars.path);
     generate(vars);
 
