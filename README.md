@@ -71,5 +71,5 @@ Graphs with various number of nodes varying from 10^2 to 10^9 are generated. The
    
 ## Members
 
-1. Gurupungav Narayanan 16CO128
+1. Gurupungav Narayanan 16CO114
 2. Nihal Haneef 16CO128
