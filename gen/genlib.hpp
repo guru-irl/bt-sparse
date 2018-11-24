@@ -20,7 +20,7 @@ opts get_defaults(){
     default_vars.n_nodes_end = 10000000;
     default_vars.n_files = 3;
     default_vars.step = 10; // Multiplied
-    default_vars.minedges = 1; 
+    default_vars.minedges = 5; 
     default_vars.maxedges = 5; 
 
     return default_vars;

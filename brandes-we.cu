@@ -1,146 +1,69 @@
-#include <cuda.h>
 #include <iostream>
-#include "include/graph.cuh"
-#include <math.h>
-
-#define CUDA_ERR_CHK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-    if (code != cudaSuccess) 
-    {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
-    }
-}
+#include <vector>
+#include "include/parallelcore.cuh"
 
 using namespace std;
 
-__device__ void find_shortest_paths( 
-    int *R, int *C, int *d, int *sigma, int *Q_curr, int *Q_next, int *S, int *S_ends, 
-    int &Q_curr_len, int &Q_next_len, int &S_len, int &S_ends_len, int &depth, int &id, int &bsize) {
+struct Graph {
+    int n_nodes;
+    vector<int> R; // Row Offset
+    vector<int> C; // Coalesced Adjacency Lists
+};
 
-    // int id = threadIdx.x;
-    // int bsize = blockDim.x;
-    int i, j, v, w, last;
+vector<float> brandes(Graph G) {
 
-    while(true) {
-        for(i = id; i < Q_curr_len; i += bsize) {
-            v = Q_curr[i];
-            for(j = R[v]; j < R[v+1]; j++) {
-                w = C[j];
-                if(atomicCAS(&d[w], -1, d[v] + 1) < 0) {
-                    last = atomicAdd(&Q_next_len, 1);
-                    Q_next[last] = w;
-                }
-                if(d[w] == (d[v] + 1)) {
-                    atomicAdd(&sigma[w], sigma[v]);
-                }
-            }
-        }
+    int *d_R, *d_C, *d_d, *d_sigma, *d_Q_curr, *d_Q_next, *d_S, *d_S_ends;
+    float *d_delta, *d_CB;
 
-        __syncthreads();
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_R, G.R.size()*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_C, G.C.size()*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_d, G.n_nodes*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_sigma, G.n_nodes*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_Q_curr, G.n_nodes*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_Q_next, G.n_nodes*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_S, G.n_nodes*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_S_ends, (G.n_nodes + 1)*sizeof(int)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_delta, G.n_nodes*sizeof(float)));
+    CUDA_ERR_CHK(cudaMalloc((void **) &d_CB, G.n_nodes*sizeof(float)));
 
-        if(Q_next_len == 0) {
-            if(id == 0)
-                depth = d[S[S_len-1]] - 1;
-            break;
-        }
-        else {
-            for(i = id; i < Q_next_len; i += bsize) {
-                Q_curr[i] = Q_next[i];
-                S[i + S_len] = Q_next[i];
-            }
+    CUDA_ERR_CHK(cudaMemcpy(d_R, &(G.R[0]), G.R.size()*sizeof(int), cudaMemcpyHostToDevice));
+    CUDA_ERR_CHK(cudaMemcpy(d_C, &(G.C[0]), G.C.size()*sizeof(int), cudaMemcpyHostToDevice));
 
-            __syncthreads();
-
-            if(id == 0) {
-                S_ends[S_ends_len] = S_ends[S_ends_len-1] + Q_next_len;
-                S_ends_len = S_ends_len + 1;
-                Q_curr_len = Q_next_len;
-                S_len = S_len + Q_next_len;
-                Q_next_len = 0;
-            }
-
-            __syncthreads();
-        }
+    for(int i = 0; i < G.n_nodes; i++) {
+        // cout << i << endl;
+        brandes_parallel <<< 1, 1024>>> (i, d_R, d_C, d_d, d_sigma, d_delta, d_Q_curr, d_Q_next, d_S, d_S_ends, d_CB, G.n_nodes);
+        CUDA_ERR_CHK(cudaPeekAtLastError());
+        CUDA_ERR_CHK(cudaThreadSynchronize()); // Checks for execution error
     }
+
+    vector<float> CB(G.n_nodes, 0);
+    CUDA_ERR_CHK(cudaMemcpy(&(CB[0]), d_CB, G.n_nodes*sizeof(float), cudaMemcpyDeviceToHost));
+    return CB;
 }
 
-__device__ void accumulate_dependencies( int *R, int *C, int *d, int *sigma, float *delta, int *S, int *S_ends, int &depth, int &id, int &bsize) {
-
-    // int id = threadIdx.x;
-    // int bsize = blockDim.x;
-    int i, j, v, w;
-    float sw, sv, dsw;
-
-    while(depth > 0) {
-        for (i = id + S_ends[depth]; i < S_ends[depth+1]; i += bsize) {
-            w = S[i];
-            dsw = 0;
-            sw = sigma[w];
-
-            for(j = R[w]; j < R[w+1]; j++) {
-                v = C[j];
-                sv = sigma[v];
-                if(d[v] = d[w] + 1) {
-                    dsw += ((sw/sv)*(1+delta[v]));
-                }
-            }
-
-            delta[w] = dsw;
-        }
-
-        __syncthreads();
-        if(id == 0) depth--;
-        __syncthreads();
-    }
-}
-
-__global__ void brandes_parallel(int *R, int *C, int *d, int *sigma, float *delta, int s, int n_nodes, int max_nodes_in_level) {
-
-    int id = threadIdx.x;
-    __shared__ int bsize = blockDim.x;
+int main() {
+    int ex_R[] = {0, 3, 5, 8, 12, 16, 20, 24, 27, 28};
+    int ex_C[] = {1, 2, 3, 0, 2, 0, 1, 3, 0, 2, 4, 5, 3, 5, 6, 7, 3, 4, 6, 7, 4, 5, 7, 8, 4, 5, 6, 6};
     
-    //(log2(4*n_nodes + 1)/log2(5)) + 1
-    __shared__ int Q_curr[n_nodes];
-    __shared__ int Q_curr_len;
-    __shared__ int Q_next[n_nodes];
-    __shared__ int Q_next_len;
-    __shared__ int S[n_nodes];
-    __shared__ int S_len;
-    __shared__ int S_ends[n_nodes];
-    __shared__ int S_ends_len;
-
-    int v;
-    for(v = id; id < n_nodes; v += bsize) {
-        if(v == s) {
-            d[v] = 0;
-            sigma[v] = 1;
-        }
-        else {
-            d[v] = -1;
-            sigma[v] = 0;
-        }
-        delta[v] = 0;
-    }
-
-    if(id == 0) {
-        Q_curr[0] = s;
-        Q_curr_len = 1;
-        Q_next_len = 0;
-        S[0] = s;
-        S_len = 1;
-        S_ends[0] = 0;
-        S_ends[1] = 1;
-        S_ends_len = 2;
-        depth = 0;
-    }
-
-    __syncthreads();
+    // int ex_R[] = {0, 1, 3, 4};
+    // int ex_C[] = {1, 0, 2, 1};
     
-    find_shortest_paths( R, C, d, sigma, Q_curr, Q_next, S, S_ends, Q_curr_len, Q_next_len, S_len, S_ends_len, depth, id, bsize);
-    __syncthreads();
+    // cout << sizeof(ex_C)/sizeof(ex_C[0]) << endl;
 
-    accumulate_dependencies(R, C, d, sigma, delta, S, S_ends, depth, id, bsize);
-    __syncthreads();
+    Graph G;
+    G.n_nodes = 9;
+    G.R = vector<int>(ex_R, ex_R + sizeof(ex_R)/sizeof(ex_R[0]));
+    G.C = vector<int>(ex_C, ex_C + sizeof(ex_C)/sizeof(ex_C[0]));
+
+    vector<float> CB = brandes(G);
+
+    int node = 0;
+    for(auto i:CB) {
+        cout << node << " : " << i << "\n";
+        node ++;
+    }
+    
+    cout << endl << endl;
+    
+    return 0;
 }
