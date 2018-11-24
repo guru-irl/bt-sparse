@@ -22,17 +22,29 @@ Few graph definitions that we deemed necessary before tackling this problem. The
 
 ## BC Calculation - The Brandes Algorithm
 
-1. The betweeness centrality each is found for each and every node in the graph G. BC for a node v is defined as the sum of the ratio of the number of shortest paths between a pair of nodes where v is present in the path to the number of shortest paths between the pair, mathematically `formula'
-2. The **Belmann Criterion** states that the number of shortest paths between s and t with v in it is given as : `formula`
-3. So basically we have to find the number of shortest paths between each pai of nodes and sum up all the pair dependencies, where δst(v) is the pair dependecy between nodes s and t with v as intermediate node.`formula`
+1. The betweeness centrality each is found for each and every node in the graph G. BC for a node v is defined as the sum of the ratio of the number of shortest paths between a pair of nodes where v is present in the path to the number of shortest paths between the pair, mathematically give as:  
+   ![Formula](images/first.png)
+2. The **Belmann Criterion** states that the number of shortest paths between s and t with v in it is given as :  
+   ![Formula](images/second.png)
+3. So basically we have to find the number of shortest paths between each pai of nodes and sum up all the pair dependencies, where δst(v) is the pair dependecy between nodes s and t with v as intermediate node.  
+   ![Formula](images/third1.png)  
+   ![Formula](images/third2.png)
 4. How do we go about counting the number of paths between each pair? 
     1. The **BFS algorithm** for graphs does it in O(m) time for unweighted graphs. 
     2. It not only gives us the length of the shortest paths but also the **predcessor list** Ps(v) which contains all the nodes from which you can reach node v via a shortest path with s as the source node.
-5. The combinatorial shortest-path counting formula is : `formula` , `example`
-6. In the Brandes algorithm, the concept of accumulation of pair dependecies was used. One node at a time is taken (basically one source node at a time in BFS, name it s) and all pair wise dependencies for node v are found with s as one of the pair members. This gives us a *dependency* of node s on v given as δs(v). `formula`
+5. The combinatorial shortest-path counting formula is :  
+   ![Formula](images/fourth.png)
+6. In the Brandes algorithm, the concept of accumulation of pair dependecies was used. One node at a time is taken (basically one source node at a time in BFS, name it s) and all pair wise dependencies for node v are found with s as one of the pair members. This gives us a *dependency* of node s on v given as δs(v).  
+   ![Formula](images/fifth.png)
 7. The summation of all dependencies on v of every node in the graph will give us the value of CB(v).
 8. How do we calculate δs(v)?
-    1. 
+    1. Consider node s as the source and v as it's only neighbour, through which multiple shortest paths are present as shown in the figure.  
+       ![Formula](images/sixth1.png) 
+    2. The dependency can be easily given as :  
+       ![Formula](images/sixth2.png) 
+    3. If multiple shortest paths are present this can be generalised to :  
+        ![Formula](images/sixth3.png)
+
 
 ## GPU Parallelisation 
 
@@ -42,5 +54,5 @@ Few graph definitions that we deemed necessary before tackling this problem. The
 
 ## Conclusion
 
-
+## References
 
