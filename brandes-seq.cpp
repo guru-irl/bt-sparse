@@ -23,7 +23,7 @@ vector<float> brandes(Graph G) {
         vector<vector<int> > P(G.n_nodes);
         vector<int> sigma(G.n_nodes, 0); sigma[s] = 1;
         vector<int> d(G.n_nodes, -1); d[s] = 0;
-
+        
         queue<int> Q;
         Q.push(s);
 

@@ -36,19 +36,26 @@ Few graph definitions that we deemed necessary before tackling this problem. The
    ![Formula](images/fourth.png)
 6. In the Brandes algorithm, the concept of accumulation of pair dependecies was used. One node at a time is taken (basically one source node at a time in BFS, name it s) and all pair wise dependencies for node v are found with s as one of the pair members. This gives us a *dependency* of node s on v given as δs(v).  
    ![Formula](images/fifth.png)
-7. The summation of all dependencies on v of every node in the graph will give us the value of CB(v).
-8. How do we calculate δs(v)?
+7. How do we calculate δs(v)?
     1. Consider node s as the source and v as it's only neighbour, through which multiple shortest paths are present as shown in the figure.  
        ![Formula](images/sixth1.png) 
     2. The dependency can be easily given as :  
        ![Formula](images/sixth2.png) 
     3. If multiple shortest paths are present this can be generalised to :  
         ![Formula](images/sixth3.png)
-
+8. The summation of all dependencies on v of every node in the graph will give us the value of CB(v).
 
 ## GPU Parallelisation 
 
-## CPU Parallelisation
+The graph traversal and the shortest path calculation are all independent and as a result, this algorithm is parallelisable. Coarse gain parallelism is implemented by passing each source node to a block and fine grained parallelism is achieved by assigning threads to vertices in path calculations.  
+We implemented the work efficient approach to parallelising the algorithm. It can briefly explained as follows: 
+1. Each source node is assigned to a block of threads.
+2. During the BFS, a thread is assigned to each node in the vertex frontier. Only after all nodes in the current vertex frontier have been inspected (i.e after a level in the graph is cleared) will allthe threads move onto the next level. A synchronisation barrier is placed for each level.
+3. Futhermore to avoid redundant work, two queues are present to ensure every node in the graph is only placed **once** in the queue.
+4. Dependency calculation is done by iterating across the levels in the reverse fashion. The delta value is calculated in a recursive manner.
+5. Cb is then calculated by suming up all the delta (dependency) values that were obtained from the previous steps.
+
+## Graph Generation
 
 ## Results
 
