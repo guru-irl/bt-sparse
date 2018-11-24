@@ -1,5 +1,7 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
+#include <chrono>
 #include "include/parallelcore.cuh"
 
 using namespace std;
@@ -38,32 +40,84 @@ vector<float> brandes(Graph G) {
 
     vector<float> CB(G.n_nodes, 0);
     CUDA_ERR_CHK(cudaMemcpy(&(CB[0]), d_CB, G.n_nodes*sizeof(float), cudaMemcpyDeviceToHost));
+
+    CUDA_ERR_CHK(cudaFree(d_R));
+    CUDA_ERR_CHK(cudaFree(d_C));
+    CUDA_ERR_CHK(cudaFree(d_d));
+    CUDA_ERR_CHK(cudaFree(d_sigma));
+    CUDA_ERR_CHK(cudaFree(d_Q_curr));
+    CUDA_ERR_CHK(cudaFree(d_Q_next));
+    CUDA_ERR_CHK(cudaFree(d_S));
+    CUDA_ERR_CHK(cudaFree(d_S_ends));
+    CUDA_ERR_CHK(cudaFree(d_delta));
+    CUDA_ERR_CHK(cudaFree(d_CB));
+
     return CB;
 }
 
 int main() {
-    int ex_R[] = {0, 3, 5, 8, 12, 16, 20, 24, 27, 28};
-    int ex_C[] = {1, 2, 3, 0, 2, 0, 1, 3, 0, 2, 4, 5, 3, 5, 6, 7, 3, 4, 6, 7, 4, 5, 7, 8, 4, 5, 6, 6};
-    
-    // int ex_R[] = {0, 1, 3, 4};
-    // int ex_C[] = {1, 0, 2, 1};
-    
-    // cout << sizeof(ex_C)/sizeof(ex_C[0]) << endl;
-
     Graph G;
-    G.n_nodes = 9;
-    G.R = vector<int>(ex_R, ex_R + sizeof(ex_R)/sizeof(ex_R[0]));
-    G.C = vector<int>(ex_C, ex_C + sizeof(ex_C)/sizeof(ex_C[0]));
 
-    vector<float> CB = brandes(G);
+    ofstream dump("dump.csv", ios::app);
+    for(int nodevals = 2; nodevals <= 8; nodevals++) {
 
-    int node = 0;
-    for(auto i:CB) {
-        cout << node << " : " << i << "\n";
-        node ++;
+        ifstream f_c;
+        ifstream f_r;
+        f_c.open("ca_lab_graphs/c" + to_string(nodevals), ios::binary);
+        f_r.open("ca_lab_graphs/r" + to_string(nodevals), ios::binary);
+
+        int n;
+        if(f_c && f_r){
+            f_c.seekg(0, f_c.end);
+            n = f_c.tellg();
+            f_c.seekg(4, f_c.beg);
+
+            G.C = vector<int> ( (n - 4)/4, 0);
+            f_c.read( (char *) &(G.C[0]), n*sizeof(int));
+
+            f_r.seekg(0, f_r.end);
+            n = f_r.tellg();
+            f_r.seekg(4, f_r.beg);
+
+            G.R = vector<int> ( (n-4)/4, 0);
+            f_r.read( (char*) &(G.R[0]), n*sizeof(int));
+
+            f_c.close();
+            f_r.close();
+        }
+
+        G.n_nodes = G.R.size() - 1;
+
+        auto start = chrono::high_resolution_clock::now();
+        vector<float> CB = brandes(G);
+        auto end = chrono::high_resolution_clock::now();
+
+        auto _time = chrono::duration_cast<chrono::milliseconds>(end - start);
+
+        ofstream fout("ca_lab_graphs/pll_a" + to_string(nodevals));
+
+        float maxBC = -1;
+        int maxNode = -1;
+
+        int node = 0;
+        for(auto i:CB) {
+            if(i > maxBC) {
+                maxBC = i;
+                maxNode = node;
+            }
+            fout << node << " : " << i << "\n";
+            node ++;
+        }
+    
+        fout << endl;
+        fout.close();
+
+        cout << "PLL," << G.n_nodes << "," << _time.count() << "ms" << endl;
+        dump << "PLL," << G.n_nodes << "," << _time.count() << endl;
+
+        cout << "BC Node = " << maxNode << ", BC = " << maxBC << endl;
+
     }
-    
-    cout << endl << endl;
-    
+    dump.close();
     return 0;
 }
