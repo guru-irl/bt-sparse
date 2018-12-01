@@ -55,12 +55,9 @@ We implemented the work efficient approach to parallelising the algorithm. It ca
 4. Dependency calculation is done by iterating across the levels in the reverse fashion. The delta value is calculated in a recursive manner.
 5. Cb is then calculated by suming up all the delta (dependency) values that were obtained from the previous steps.
 
-## Uniqueness 
-
 ## Results
 
 Graphs with various number of nodes varying from 10^2 to 10^9 are generated. The algorithm was run on all these graphs and the BC values along with time taken were tabulated and shown below.  
-
 
 
 ## References
